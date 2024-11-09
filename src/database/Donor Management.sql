@@ -410,3 +410,157 @@ END //
 DELIMITER ;
 
 -- call ReadFacilitatorCostumerByYear(2024);
+
+-- Create Donor
+DELIMITER //
+CREATE PROCEDURE CreateDonor(
+	IN p_donation_date DATE,
+	IN p_volume_ml INT,
+	IN p_person_id INT,
+	IN p_facilitator_id INT
+)
+BEGIN
+	INSERT INTO donor (donation_date, volume_ml, person_id, facilitator_id)
+	VALUES (p_donation_date , p_volume_ml, p_person_id, p_facilitator_id);
+END // 
+DELIMITER ;
+
+-- Read All Donor
+DELIMITER //
+CREATE PROCEDURE ReadDonor()
+BEGIN
+	SELECT * FROM donor;
+END //
+DELIMITER ;
+
+-- Read Donor By Id
+DELIMITER //
+CREATE PROCEDURE ReadDonorById(
+	IN p_donor_id INT
+)
+BEGIN
+	SELECT * FROM donor
+	WHERE donor_id = p_donor_id;
+END //
+DELIMITER ;
+
+-- Update Specific Donor Data
+DELIMITER //
+CREATE PROCEDURE UpdateDonor(
+	IN p_donor_id INT,
+	IN p_donation_date DATE,
+	IN p_volume_ml INT,
+	IN p_person_id INT,
+	IN p_facilitator_id INT
+)
+BEGIN
+	UPDATE donor SET
+	donation_date = p_donation_date,
+	volume_ml = p_volume_ml,
+	person_id = p_person_id,
+	facilitator_id = p_facilitator_id
+	WHERE donor_id = p_donor_id;
+END //
+DELIMITER ;
+
+-- Delete Spesific Donor Data
+CREATE PROCEDURE DeleteDonor(
+	IN p_donor_id INT
+)
+BEGIN
+	DELETE FROM donor
+	WHERE donor_id = p_donor_id;
+END //
+DELIMITER ;
+
+-- Sum Donor
+DELIMITER //
+CREATE FUNCTION SumDonor()
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total_volume INT;  
+    	SELECT SUM(volume_ml) INTO total_volume FROM donor;
+	RETURN total_volume;
+END //
+DELIMITER ;
+
+-- Create Transfusion
+SELECT * from transfusion;
+DELIMITER //
+CREATE PROCEDURE CreateTransfusion(
+	IN p_transfusion_date DATE,
+	IN p_volume_ml INT,
+	In p_donor_id INT,
+	IN p_facilitator_id INT,
+	IN p_person_id INT
+)
+BEGIN
+	INSERT INTO transfusion (transfusion_date, volume_ml, donor_id, facilitator_id, person_id)
+	VALUES (p_transfusion_date , p_volume_ml, p_donor_id, p_facilitator_id, p_person_id);
+END // 
+DELIMITER ;
+
+-- Read All Transfusion
+DELIMITER //
+CREATE PROCEDURE ReadTransfusion()
+BEGIN
+	SELECT * FROM transfusion;
+END //
+DELIMITER ;
+
+-- Read Transfusion By Id
+DELIMITER //
+CREATE PROCEDURE ReadTransfusionById(
+	IN p_transfusion_id INT
+)
+BEGIN
+	SELECT * FROM transfusion
+	WHERE transfusion_id = p_transfusion_id;
+END //
+DELIMITER ;
+
+-- Update Specific Transfusion Data
+DELIMITER //
+CREATE PROCEDURE UpdateTransfusion(
+	IN p_transfusion_id INT,
+	IN p_transfusion_date DATE,
+	IN p_volume_ml INT,
+	In p_donor_id INT,
+	IN p_facilitator_id INT,
+	IN p_person_id INT
+)
+BEGIN
+	UPDATE transfusion SET
+	transfusion_date = p_transfusion_date,
+	volume_ml = p_volume_ml,
+	donor_id = p_donor_id,
+	facilitator_id = p_facilitator_id,
+	person_id = p_person_id
+	WHERE transfusion_id = p_transfusion_id;
+END //
+DELIMITER ;
+
+-- Delete Spesific Transfusion Data
+CREATE PROCEDURE DeleteTransfusion(
+	IN p_transfusion_id INT
+)
+BEGIN
+	DELETE FROM transfusion
+	WHERE transfusion_id = p_transfusion_id;
+END //
+DELIMITER ;
+
+-- Sum Transfusion
+DELIMITER //
+CREATE FUNCTION Sumtransfusion()
+RETURNS INT
+DETERMINISTIC
+BEGIN
+    DECLARE total_volume INT;  
+    	SELECT SUM(volume_ml) INTO total_volume FROM transfusion;
+	RETURN total_volume;
+END //
+DELIMITER ;
+
+SELECT SumDonor();

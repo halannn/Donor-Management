@@ -1,7 +1,7 @@
 import db from "../config/mysql.js";
 
 export const getFacilitator = (req, res) => {
-  const sql = "call ReadAllFacilitator()";
+  const sql = "call ReadFacilitator()";
   db.query(sql, (err, results) => {
     if (err) return res.status(500);
     res.json(results[0]);

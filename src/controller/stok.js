@@ -1,7 +1,7 @@
 import db from "../config/mysql.js";
 
 export const readStock = (req, res) => {
-  const sql = "call ReadAllStock()";
+  const sql = "call ReadStock()";
   db.query(sql, (err, results) => {
     if (err) throw err;
     res.json(results[0]);
@@ -19,7 +19,7 @@ export const readStockById = (req, res) => {
   });
 };
 
-export const readSumStock = (req,res) => {
+export const readSumStock = (req, res) => {
   const sql = "SELECT SumStock()";
   db.query(sql, (err, results) => {
     if (err) throw err;
