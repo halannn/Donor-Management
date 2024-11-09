@@ -1,19 +1,35 @@
 import express from "express";
-import { getFacilitator, getFacilitatorById } from "../controller/facilitator.js";
+import {
+  createFacilitator,
+  deleteFacilitator,
+  getFacilitator,
+  getFacilitatorById,
+  getFacilitatorByType,
+  getFacilitatorCostumerByYear,
+  getFacilitatorDonor,
+  getFacilitatorStock,
+  getFacilitatorTransfusion,
+  updateFacilitator,
+} from "../controller/facilitator.js";
 
 const router = express.Router();
 // Middleware to parse JSON bodies
 router.use(express.json());
 
-// Create new Facilitator
-router
-  .route("/")
-  // Get all Facilitators
-  .get(getFacilitator)
+router.route("/stock").get(getFacilitatorStock);
+router.route("/donor").get(getFacilitatorDonor);
+router.route("/transfusion").get(getFacilitatorTransfusion);
 
 router
   .route("/:id")
-  // Get Facilitator by ID
-  .get(getFacilitatorById);
+  .get(getFacilitatorById)
+  .put(updateFacilitator)
+  .delete(deleteFacilitator);
+
+router.route("/type/:type").get(getFacilitatorByType);
+
+router.route("/year/:year").get(getFacilitatorCostumerByYear);
+
+router.route("/").get(getFacilitator).post(createFacilitator);
 
 export default router;

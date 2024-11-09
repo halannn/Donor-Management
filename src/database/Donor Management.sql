@@ -164,8 +164,10 @@ CREATE PROCEDURE CreateStock(
     IN p_facilitator_id INT
 )
 BEGIN
+	START TRANSACTION
     INSERT INTO `stock` (`blood_type`, `volume_ml`, `facilitator_id`) 
     VALUES (p_blood_type, p_volume_ml, p_facilitator_id);
+   	COMMIT;
 END //
 DELIMITER ;
 
@@ -257,3 +259,154 @@ BEGIN
       AND `facilitator_id` = NEW.`facilitator_id`;
 END //
 DELIMITER ;
+
+-- Create Facilitator
+DELIMITER //
+CREATE PROCEDURE CreateFacilitator(
+    IN p_facilitator_name VARCHAR(255),
+    IN p_facilitator_type enum("Hospital","Clinic"),
+    IN p_address VARCHAR(255),
+    IN p_contact VARCHAR(255)
+)
+BEGIN
+    INSERT INTO `facilitator` (`facilitator_name`, `facilitator_type`, `address`, `contact`) 
+    VALUES (p_facilitator_name, p_facilitator_type, p_address, p_contact);
+END //
+DELIMITER ;
+
+-- Read All Facilitator Data
+DELIMITER //
+CREATE PROCEDURE ReadAllFacilitator()
+BEGIN
+    SELECT * FROM `facilitator`;
+END //
+DELIMITER ;
+
+-- Read All Facilitator Data
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorById(
+	IN p_facilitator_id INT
+)
+BEGIN
+    SELECT * FROM `facilitator`
+    WHERE facilitator_id = p_facilitator_id;
+END //
+DELIMITER ;
+
+-- Update Specific Facilitator Data
+
+DELIMITER //
+CREATE PROCEDURE UpdateFacilitator(
+	IN p_facilitator_id INT,
+    IN p_facilitator_name VARCHAR(255),
+    IN p_facilitator_type enum("Hospital","Clinic"),
+    IN p_address VARCHAR(255),
+    IN p_contact VARCHAR(255)
+)
+BEGIN
+    UPDATE facilitator 
+    SET 
+    facilitator_name = p_facilitator_name ,
+    facilitator_type = p_facilitator_type ,
+    address = p_address ,
+ 	contact = p_contact 
+    WHERE facilitator_id = p_facilitator_id;
+END //
+DELIMITER ;
+
+-- Delete Specific Facilitator Data
+DELIMITER //
+CREATE PROCEDURE DeleteFacilitator(
+    IN p_facilitator_id INT
+)
+BEGIN
+    DELETE FROM `facilitator` WHERE `facilitator_id` = p_facilitator_id;
+END //
+DELIMITER ;
+
+-- List Facilitators by Type
+DELIMITER //
+
+CREATE PROCEDURE ReadFacilitatorByType(IN p_facilitator_type ENUM('Hospital', 'Clinic'))
+BEGIN
+    SELECT 
+        f.facilitator_type,
+        f.facilitator_name,
+        COUNT(d.donor_id) AS TotalDonors,
+        COUNT(t.transfusion_id) AS TotalTransfusions
+    FROM facilitator f
+    LEFT JOIN donor d ON f.facilitator_id = d.facilitator_id
+    LEFT JOIN transfusion t ON f.facilitator_id = t.facilitator_id
+    WHERE f.facilitator_type = p_facilitator_type
+    GROUP BY f.facilitator_id, f.facilitator_name, f.facilitator_type;
+END //
+
+DELIMITER ;
+
+
+-- List All Blood Stock by Facilitator
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorStock()
+BEGIN
+    SELECT f.`facilitator_name`, s.`blood_type`, s.`volume_ml`
+    FROM `stock` s
+    JOIN `facilitator` f ON s.`facilitator_id` = f.`facilitator_id`;
+END //
+DELIMITER ;
+
+-- List Donor Data
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorDonor()
+BEGIN
+    SELECT 
+        f.`facilitator_name`, 
+        d.`donation_date`, 
+        p.`full_name` AS `donor_name`, 
+        p.`blood_type`, 
+        d.`volume_ml`
+    FROM `donor` d
+    JOIN `person` p ON d.`person_id` = p.`person_id`
+    JOIN `facilitator` f ON d.`facilitator_id` = f.`facilitator_id`;
+END //
+DELIMITER ;
+
+-- List Transfusion Data
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorTransfusion()
+BEGIN
+    SELECT 
+        f.`facilitator_name`, 
+        t.`transfusion_date`, 
+        p.`full_name` AS `recipient_name`, 
+        p.`blood_type`, 
+        t.`volume_ml`
+    FROM `transfusion` t
+    JOIN `person` p ON t.`person_id` = p.`person_id`
+    JOIN `facilitator` f ON t.`facilitator_id` = f.`facilitator_id`;
+END //
+DELIMITER ;
+
+-- List Donor and Recipient Data by Year
+
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorCostumerByYear(IN p_year INT)
+BEGIN
+    SELECT 
+        f.`facilitator_name`, 
+        p1.`blood_type`, 
+        d.`donation_date`, 
+        p1.`full_name` AS `donor_name`, 
+        d.`volume_ml` AS `donor_volume`, 
+        t.`transfusion_date`, 
+        p2.`full_name` AS `recipient_name`, 
+        t.`volume_ml` AS `transfusion_volume`
+    FROM `facilitator` f
+    JOIN `donor` d ON d.`facilitator_id` = f.`facilitator_id`
+    JOIN `person` p1 ON d.`person_id` = p1.`person_id`
+    JOIN `transfusion` t ON t.`facilitator_id` = f.`facilitator_id`
+    JOIN `person` p2 ON t.`person_id` = p2.`person_id`
+    WHERE YEAR(d.`donation_date`) = p_year OR YEAR(t.`transfusion_date`) = p_year;
+END //
+DELIMITER ;
+
+-- call ReadFacilitatorCostumerByYear(2024);

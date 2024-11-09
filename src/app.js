@@ -8,9 +8,9 @@ dotenv.config();
 
 const app = express();
 
+app.use("/api/stock", stokRouter);
 app.use("/api/facilitator", facilitatorRouter);
 app.use("/api/donor", donorRouter);
-app.use("/api/stock", stokRouter);
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
   //Connet to database
