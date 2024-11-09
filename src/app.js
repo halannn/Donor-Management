@@ -4,6 +4,7 @@ import facilitatorRouter from "./routes/facilitator.js";
 import donorRouter from "./routes/donor.js";
 import stokRouter from "./routes/stok.js";
 import transfusionRouter from "./routes/transfusion.js";
+import personRouter from "./routes/person.js";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -13,6 +14,7 @@ app.use("/api/stock", stokRouter);
 app.use("/api/facilitator", facilitatorRouter);
 app.use("/api/donor", donorRouter);
 app.use("/api/transfusion", transfusionRouter);
+app.use('/api/person', personRouter);
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
   //Connet to database

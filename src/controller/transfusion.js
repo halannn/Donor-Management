@@ -48,7 +48,7 @@ export const createTransfusion = (req, res) => {
   }
   db.query(
     sql,
-    [transfusion_date, volume_ml, person_id, facilitator_id, person_id ],
+    [transfusion_date, volume_ml, person_id, facilitator_id, person_id],
     (err) => {
       if (err) {
         console.error(err); // Log the error for debugging
