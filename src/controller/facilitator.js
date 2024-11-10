@@ -52,17 +52,6 @@ export const getFacilitatorTransfusion = (req, res) => {
   });
 };
 
-export const getFacilitatorCostumerByYear = (req, res) => {
-  const sql = "call ReadFacilitatorCostumerByYear(?)";
-  db.query(sql, [req.params.year], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (result.length === 0) {
-      return res.status(404).json({ message: "Facilitator not found" });
-    }
-    res.json(result[0]);
-  });
-};
-
 export const getFacilitatorStock = (req, res) => {
   const sql = "call ReadFacilitatorStock()";
   db.query(sql, (err, result) => {

@@ -5,7 +5,6 @@ import {
   getFacilitator,
   getFacilitatorById,
   getFacilitatorByType,
-  getFacilitatorCostumerByYear,
   getFacilitatorDonor,
   getFacilitatorStock,
   getFacilitatorTransfusion,
@@ -27,8 +26,6 @@ router
   .delete(deleteFacilitator);
 
 router.route("/type/:type").get(getFacilitatorByType);
-
-router.route("/year/:year").get(getFacilitatorCostumerByYear);
 
 router.route("/").get(getFacilitator).post(createFacilitator);
 
