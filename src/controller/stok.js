@@ -1,36 +1,27 @@
 import db from "../config/mysql.js";
 
 export const readStock = (req, res) => {
-  const sql = "call ReadStock()";
-  db.query(sql, (err, results) => {
-    if (err) throw err;
-    res.json(results[0]);
-  });
-};
-
-export const readStockById = (req, res) => {
-  const sql = "call ReadStockById(?)";
-  db.query(sql, req.params.id, (err, results) => {
+  const sql = "call ReadStock(?)";
+  const { id } = req.params;
+  db.query(sql, [id], (err, results) => {
     if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Database error" });
+      return res.status(400).json({ message: "Params must be a number" });
     }
-    res.json(results[0]);
-  });
-};
-
-export const readSumStock = (req, res) => {
-  const sql = "SELECT SumStock()";
-  db.query(sql, (err, results) => {
-    if (err) throw err;
-    res.json(results[0]);
+    if (results[0].length !== 1) {
+      res.json(results[0]);
+    } else {
+      res.json(results[0][0]);
+    }
   });
 };
 
 export const createStok = (req, res) => {
   const sql = "call CreateStock(?, ?, ?)";
   const { blood_type, volume_ml, facilitator_id } = req.body;
-  db.query(sql, [blood_type, volume_ml, facilitator_id], (err, result) => {
+  if (!blood_type || !volume_ml || !facilitator_id) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+  db.query(sql, [blood_type, volume_ml, facilitator_id], (err) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: "Database error" });
@@ -41,23 +32,31 @@ export const createStok = (req, res) => {
 
 export const updateStock = (req, res) => {
   const sql = "call UpdateStock(?, ?, ?)";
+  const { id } = req.params;
   const { blood_type, volume_ml } = req.body;
-  db.query(sql, [req.params.id, blood_type, volume_ml], (err, result) => {
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "Params must be a number" });
+  }
+  if (!blood_type || !volume_ml) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+  db.query(sql, [id, blood_type, volume_ml], (err, result) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: "Database error" });
     }
-    res.status(201).json({ message: "Stock updated successfully" });
+    res.status(200).json({ message: "Stock updated successfully" });
   });
 };
 
 export const deleteStock = (req, res) => {
   const sql = "call DeleteStock(?)";
-  db.query(sql, req.params.id, (err) => {
+  const { id } = req.params;
+  db.query(sql, [id], (err) => {
     if (err) {
       console.error(err);
-      return res.status(500).json({ error: "Database error" });
+      return res.status(400).json({ message: "Params must be a number" });
     }
-    res.status(201).json({ message: "Stock deleted successfully" });
+    res.status(200).json({ message: "Stock deleted successfully" });
   });
 };

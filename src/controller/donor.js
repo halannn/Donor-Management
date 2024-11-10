@@ -1,50 +1,32 @@
 import db from "../config/mysql.js";
 
-export const getDonor = (req, res) => {
-  const sql = "call ReadDonor()";
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results[0]);
-  });
-};
-
-export const getDonorById = (req, res) => {
-  const sql = "call ReadDonorById(?)";
+export const readDonor = (req, res) => {
+  const sql = "call ReadDonor(?)";
   const { id } = req.params;
-  if (!id) {
-    return res.status(400).json({ error: "Donor ID is required" });
-  }
   db.query(sql, [id], (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (results[0].length === 0) {
-      return res.status(404).json({ error: "Donor not found" });
+    if (err) {
+      return res.status(400).json({ message: "Params must be a number" });
     }
-    res.json(results[0][0]);
-  });
-};
-
-export const getSumDonor = (req, res) => {
-  const sql = "SELECT SumDonor()";
-  db.query(sql, (err, results) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(results[0]);
+    if (results[0].length !== 1) {
+      res.json(results[0]);
+    } else {
+      res.json(results[0][0]);
+    }
   });
 };
 
 export const createDonor = (req, res) => {
   const sql = "call CreateDonor(?, ?, ?, ?)";
   const { donation_date, amount_id, person_id, facilitator_id } = req.body;
-
   if (!donation_date || !amount_id || !person_id || !facilitator_id) {
     return res.status(400).json({ error: "All fields are required" });
   }
-
   db.query(
     sql,
     [donation_date, amount_id, person_id, facilitator_id],
     (err) => {
       if (err) {
-        console.error(err); // Log the error for debugging
+        console.error(err);
         return res.status(500).json({ error: "Database error" });
       }
       res.status(201).json({ message: "Donor created successfully" });
@@ -56,8 +38,8 @@ export const updateDonor = (req, res) => {
   const sql = "call UpdateDonor(?, ?, ?, ?, ?)";
   const { id } = req.params;
   const { donation_date, amount_id, person_id, facilitator_id } = req.body;
-  if (!id) {
-    return res.status(400).json({ error: "Donor ID is required" });
+  if (isNaN(id)) {
+    return res.status(400).json({ error: "Params must be a number" });
   }
   if (!donation_date || !amount_id || !person_id || !facilitator_id) {
     return res.status(400).json({ error: "All fields are required" });
@@ -65,13 +47,12 @@ export const updateDonor = (req, res) => {
   db.query(
     sql,
     [id, donation_date, amount_id, person_id, facilitator_id],
-    (err, result) => {
+    (err) => {
       if (err) {
-        console.error(err); // Log the error for debugging
+        console.error(err);
         return res.status(500).json({ error: "Database error" });
       }
-      console.log(result);
-      res.json({ message: "Donor updated successfully" });
+      res.status(200).json({ message: "Donor updated successfully" });
     }
   );
 };
@@ -79,15 +60,10 @@ export const updateDonor = (req, res) => {
 export const deleteDonor = (req, res) => {
   const sql = "call DeleteDonor(?)";
   const { id } = req.params;
-  if (!id) {
-    return res.status(400).json({ error: "Donor ID is required" });
-  }
-  db.query(sql, [id], (err, result) => {
+  db.query(sql, [id], (err) => {
     if (err) {
-      console.error(err); // Log the error for debugging
-      return res.status(500).json({ error: "Database error" });
+      return res.status(400).json({ message: "Params must be a number" });
     }
-    console.log(result);
     res.json({ message: "Donor deleted successfully" });
   });
 };

@@ -2,6 +2,31 @@
 -- use Donor_Management;
 -- DROP database Donor_Management;
 
+CREATE TABLE role (
+  role_id int PRIMARY KEY AUTO_INCREMENT,
+  role_name VARCHAR(255)
+);
+
+CREATE TABLE account (
+  account_id int PRIMARY KEY AUTO_INCREMENT,
+  user_name varchar(255), 
+  email varchar(255),
+  password varchar(255),
+  role_id int
+);
+
+CREATE TABLE person (
+  person_id int PRIMARY KEY AUTO_INCREMENT,
+  full_name varchar(255),
+  age int,
+  blood_type enum("A+","A-","B+","B-","AB+","AB-","O+","O-"),
+  gender enum("Male","Female"),
+  address varchar(255),
+  contact varchar(20),
+  account_id int,
+  FOREIGN KEY (account_id) REFERENCES account(account_id) ON DELETE CASCADE
+);
+
 CREATE TABLE facilitator (
   facilitator_id int PRIMARY KEY AUTO_INCREMENT,
   facilitator_name varchar(255),
@@ -15,18 +40,9 @@ CREATE TABLE donor (
   donation_date date,
   volume_ml int,
   person_id int,
-  facilitator_id int
-);
-
-CREATE TABLE person (
-  person_id int PRIMARY KEY AUTO_INCREMENT,
-  full_name varchar(255),
-  age int,
-  blood_type enum("A+","A-","B+","B-","AB+","AB-","O+","O-"),
-  gender enum("Male","Female"),
-  address varchar(255),
-  contact varchar(20),
-  account_id int
+  facilitator_id int,
+  FOREIGN KEY (person_id) REFERENCES person(person_id) ON DELETE CASCADE,
+  FOREIGN KEY (facilitator_id) REFERENCES facilitator(facilitator_id) ON DELETE CASCADE
 );
 
 CREATE TABLE transfusion (
@@ -34,44 +50,45 @@ CREATE TABLE transfusion (
   transfusion_date date,
   volume_ml int,
   facilitator_id int,
-  person_id int
+  person_id int,
+  FOREIGN KEY (facilitator_id) REFERENCES facilitator(facilitator_id) ON DELETE CASCADE,
+  FOREIGN KEY (person_id) REFERENCES person(person_id) ON DELETE CASCADE
 );
 
 CREATE TABLE stock (
   stock_id int PRIMARY KEY AUTO_INCREMENT,
   blood_type enum("A+","A-","B+","B-","AB+","AB-","O+","O-"),
   volume_ml int,
-  facilitator_id int
+  facilitator_id int,
+  FOREIGN KEY (facilitator_id) REFERENCES facilitator(facilitator_id) ON DELETE CASCADE
 );
 
-CREATE TABLE account (
-  account_id int PRIMARY KEY AUTO_INCREMENT,
-  user_name varchar(255), 
-  email varchar(255),
-  password varchar(255),
-  role_id int
-);
+DELIMITER //
 
-CREATE TABLE role (
-  role_id int PRIMARY KEY AUTO_INCREMENT,
-  role_name VARCHAR(255)
-);
+CREATE TRIGGER delete_donor_after_person_delete
+AFTER DELETE ON person
+FOR EACH ROW
+BEGIN
+    DELETE FROM donor WHERE person_id = OLD.person_id;
+END //
 
-ALTER TABLE account ADD FOREIGN KEY (role_id) REFERENCES role (role_id);
+CREATE TRIGGER delete_transfusion_after_person_delete
+AFTER DELETE ON person
+FOR EACH ROW
+BEGIN
+    DELETE FROM transfusion WHERE person_id = OLD.person_id;
+END //
 
-ALTER TABLE donor ADD FOREIGN KEY (person_id) REFERENCES person (person_id);
+CREATE TRIGGER delete_stock_after_facilitator_delete
+AFTER DELETE ON facilitator
+FOR EACH ROW
+BEGIN
+    DELETE FROM stock WHERE facilitator_id = OLD.facilitator_id;
+    DELETE FROM donor WHERE facilitator_id = OLD.facilitator_id;
+    DELETE FROM transfusion WHERE facilitator_id = OLD.facilitator_id;
+END //
 
-ALTER TABLE donor ADD FOREIGN KEY (facilitator_id) REFERENCES facilitator (facilitator_id);
-
-ALTER TABLE person ADD FOREIGN KEY (account_id) REFERENCES account (account_id);
-
-ALTER TABLE transfusion ADD FOREIGN KEY (donor_id) REFERENCES donor (donor_id);
-
-ALTER TABLE transfusion ADD FOREIGN KEY (facilitator_id) REFERENCES facilitator (facilitator_id);
-
-ALTER TABLE transfusion ADD FOREIGN KEY (person_id) REFERENCES person (person_id);
-
-ALTER TABLE stock ADD FOREIGN KEY (facilitator_id) REFERENCES facilitator (facilitator_id);
+DELIMITER ;
 
 -- Create Stock
 DELIMITER //
@@ -81,29 +98,24 @@ CREATE PROCEDURE CreateStock(
     IN p_facilitator_id INT
 )
 BEGIN
-	START TRANSACTION
+	START transaction;
     INSERT INTO `stock` (`blood_type`, `volume_ml`, `facilitator_id`) 
     VALUES (p_blood_type, p_volume_ml, p_facilitator_id);
    	COMMIT;
 END //
 DELIMITER ;
 
--- Read All Stock Data
+-- Read Stock Data (All or By ID)
 DELIMITER //
-CREATE PROCEDURE ReadAllStock()
-BEGIN
-    SELECT * FROM `stock`;
-END //
-DELIMITER ;
-
--- Read Stock Data By Id
-DELIMITER //
-CREATE PROCEDURE ReadStockById(
-	IN p_stock_id INT
+CREATE PROCEDURE ReadStock(
+    IN p_stock_id INT
 )
 BEGIN
-    SELECT * FROM `stock`
-    WHERE `stock_id` = p_stock_id;
+    IF p_stock_id IS NULL THEN
+        SELECT * FROM `stock`;
+    ELSE
+        SELECT * FROM `stock` WHERE `stock_id` = p_stock_id;
+    END IF;
 END //
 DELIMITER ;
 
@@ -114,12 +126,14 @@ CREATE PROCEDURE UpdateStock(
     IN p_blood_type enum("A+","A-","B+","B-","AB+","AB-","O+","O-"), 
     IN p_volume_ml INT
 )
-BEGIN
+begin
+	START transaction;
     UPDATE `stock`
     SET 
     `blood_type` = p_blood_type,
     `volume_ml` = p_volume_ml
     WHERE `stock_id` = p_stock_id;
+    COMMIT;
 END //
 DELIMITER ;
 
@@ -128,8 +142,10 @@ DELIMITER //
 CREATE PROCEDURE DeleteStock(
     IN p_stock_id INT
 )
-BEGIN
+begin
+	START TRANSACTION;
     DELETE FROM `stock` WHERE `stock_id` = p_stock_id;
+    COMMIT;
 END //
 DELIMITER ;
 
@@ -148,11 +164,9 @@ BEGIN
 END //
 DELIMITER ;
 
--- SELECT SumStock();
-
 -- Update Stock on Donor Addition
 DELIMITER //
-CREATE TRIGGER UpdateStockOnDonor
+CREATE TRIGGER UpdateStockAfterDonor
 AFTER INSERT ON `donor`
 FOR EACH ROW
 BEGIN
@@ -165,7 +179,7 @@ DELIMITER ;
 
 -- Update Stock on Transfusion Addition
 DELIMITER //
-CREATE TRIGGER UpdateStockOnTransfusion
+CREATE TRIGGER UpdateStockAfterTransfusion
 AFTER INSERT ON `transfusion`
 FOR EACH ROW
 BEGIN
@@ -175,10 +189,10 @@ BEGIN
       AND `facilitator_id` = NEW.`facilitator_id`;
 END //
 DELIMITER ;
--- Search fasilitator from stock
 
+-- Search fasilitator from stock
 DELIMITER //
-CREATE PROCEDURE GetFacilitatorStockDetails(IN facilitatorID INT)
+CREATE PROCEDURE ReadStockDetails(IN facilitatorID INT)
 BEGIN
     DECLARE total_stock VARCHAR(255);
     
@@ -213,64 +227,83 @@ CREATE PROCEDURE CreateFacilitator(
     IN p_address VARCHAR(255),
     IN p_contact VARCHAR(255)
 )
-BEGIN
+begin
+	START TRANSACTION;
     INSERT INTO `facilitator` (`facilitator_name`, `facilitator_type`, `address`, `contact`) 
     VALUES (p_facilitator_name, p_facilitator_type, p_address, p_contact);
+   commit;
 END //
 DELIMITER ;
 
--- Read All Facilitator Data
+-- Read Facilitator Data (All or By ID)
 DELIMITER //
-CREATE PROCEDURE ReadAllFacilitator()
-BEGIN
-    SELECT * FROM `facilitator`;
-END //
-DELIMITER ;
-
--- Read All Facilitator Data
-DELIMITER //
-CREATE PROCEDURE ReadFacilitatorById(
-	IN p_facilitator_id INT
+CREATE PROCEDURE ReadFacilitator(
+    IN p_facilitator_id INT
 )
 BEGIN
-    SELECT * FROM `facilitator`
-    WHERE facilitator_id = p_facilitator_id;
+    IF p_facilitator_id IS NULL THEN
+        SELECT * FROM `facilitator`;
+    ELSE
+        SELECT * FROM `facilitator`
+        WHERE `facilitator_id` = p_facilitator_id;
+    END IF;
 END //
 DELIMITER ;
+call ReadFacilitator(null);
 
--- Update Specific Facilitator Data
+-- Update Specific Facilitator Data with Transaction
 DELIMITER //
 CREATE PROCEDURE UpdateFacilitator(
-	IN p_facilitator_id INT,
+    IN p_facilitator_id INT,
     IN p_facilitator_name VARCHAR(255),
-    IN p_facilitator_type enum("Hospital","Clinic"),
+    IN p_facilitator_type ENUM('Hospital', 'Clinic'),
     IN p_address VARCHAR(255),
     IN p_contact VARCHAR(255)
 )
 BEGIN
-    UPDATE facilitator 
+    START TRANSACTION;
+    
+    UPDATE `facilitator` 
     SET 
-    facilitator_name = p_facilitator_name ,
-    facilitator_type = p_facilitator_type ,
-    address = p_address ,
- 	contact = p_contact 
-    WHERE facilitator_id = p_facilitator_id;
+        `facilitator_name` = p_facilitator_name,
+        `facilitator_type` = p_facilitator_type,
+        `address` = p_address,
+        `contact` = p_contact
+    WHERE 
+        `facilitator_id` = p_facilitator_id;
+    
+    -- Error handling
+    IF ROW_COUNT() = 0 THEN
+        ROLLBACK; -- Undo changes if no rows are updated
+    ELSE
+        COMMIT; -- Confirm changes if successful
+    END IF;
 END //
 DELIMITER ;
 
--- Delete Specific Facilitator Data
+-- Delete Specific Facilitator Data with Transaction and Error Handling
 DELIMITER //
 CREATE PROCEDURE DeleteFacilitator(
     IN p_facilitator_id INT
 )
 BEGIN
-    DELETE FROM `facilitator` WHERE `facilitator_id` = p_facilitator_id;
+    START TRANSACTION;
+
+    DELETE FROM `facilitator` 
+    WHERE `facilitator_id` = p_facilitator_id;
+
+    -- Error handling
+    IF ROW_COUNT() = 0 THEN
+        ROLLBACK; -- Undo transaction if no rows were deleted
+    ELSE
+        COMMIT; -- Confirm changes if deletion is successful
+    END IF;
 END //
 DELIMITER ;
 
 -- List Facilitators by Type
 DELIMITER //
-CREATE PROCEDURE ReadFacilitatorByType(IN p_facilitator_type ENUM('Hospital', 'Clinic'))
+CREATE PROCEDURE ReadFacilitatorByType(IN p_facilitator_type VARCHAR(255))
 BEGIN
     SELECT 
         f.facilitator_type,
@@ -280,7 +313,7 @@ BEGIN
     FROM facilitator f
     LEFT JOIN donor d ON f.facilitator_id = d.facilitator_id
     LEFT JOIN transfusion t ON f.facilitator_id = t.facilitator_id
-    WHERE f.facilitator_type = p_facilitator_type
+    WHERE p_facilitator_type IS NULL OR f.facilitator_type = p_facilitator_type
     GROUP BY f.facilitator_id, f.facilitator_name, f.facilitator_type;
 END //
 DELIMITER ;
@@ -291,7 +324,8 @@ CREATE PROCEDURE ReadFacilitatorStock()
 BEGIN
     SELECT f.`facilitator_name`, s.`blood_type`, s.`volume_ml`
     FROM `stock` s
-    JOIN `facilitator` f ON s.`facilitator_id` = f.`facilitator_id`;
+    JOIN `facilitator` f ON s.`facilitator_id` = f.`facilitator_id`
+    ORDER BY f.`facilitator_name`;
 END //
 DELIMITER ;
 
@@ -327,30 +361,6 @@ BEGIN
 END //
 DELIMITER ;
 
--- List Donor and Recipient Data by Year
-DELIMITER //
-CREATE PROCEDURE ReadFacilitatorCostumerByYear(IN p_year INT)
-BEGIN
-    SELECT 
-        f.`facilitator_name`, 
-        p1.`blood_type`, 
-        d.`donation_date`, 
-        p1.`full_name` AS `donor_name`, 
-        d.`volume_ml` AS `donor_volume`, 
-        t.`transfusion_date`, 
-        p2.`full_name` AS `recipient_name`, 
-        t.`volume_ml` AS `transfusion_volume`
-    FROM `facilitator` f
-    JOIN `donor` d ON d.`facilitator_id` = f.`facilitator_id`
-    JOIN `person` p1 ON d.`person_id` = p1.`person_id`
-    JOIN `transfusion` t ON t.`facilitator_id` = f.`facilitator_id`
-    JOIN `person` p2 ON t.`person_id` = p2.`person_id`
-    WHERE YEAR(d.`donation_date`) = p_year OR YEAR(t.`transfusion_date`) = p_year;
-END //
-DELIMITER ;
-
--- call ReadFacilitatorCostumerByYear(2024);
-
 -- Create Donor
 DELIMITER //
 CREATE PROCEDURE CreateDonor(
@@ -359,30 +369,28 @@ CREATE PROCEDURE CreateDonor(
 	IN p_person_id INT,
 	IN p_facilitator_id INT
 )
-BEGIN
+begin
+	START transaction;
 	INSERT INTO donor (donation_date, volume_ml, person_id, facilitator_id)
 	VALUES (p_donation_date , p_volume_ml, p_person_id, p_facilitator_id);
+	commit;
 END // 
 DELIMITER ;
 
 -- Read All Donor
 DELIMITER //
-CREATE PROCEDURE ReadDonor()
-BEGIN
-	SELECT * FROM donor;
-END //
-DELIMITER ;
-
--- Read Donor By Id
-DELIMITER //
-CREATE PROCEDURE ReadDonorById(
-	IN p_donor_id INT
+create procedure ReadDonor(
+	in p_donor_id INT
 )
 BEGIN
-	SELECT * FROM donor
-	WHERE donor_id = p_donor_id;
+    IF p_donor_id IS NULL THEN
+        SELECT * FROM `donor`;
+    ELSE
+        SELECT * FROM `donor`
+        WHERE `donor_id` = p_donor_id;
+    END IF;
 END //
-DELIMITER ;
+DELIMITER ; 
 
 -- Update Specific Donor Data
 DELIMITER //
@@ -393,70 +401,59 @@ CREATE PROCEDURE UpdateDonor(
 	IN p_person_id INT,
 	IN p_facilitator_id INT
 )
-BEGIN
+begin
+	start transaction;
 	UPDATE donor SET
 	donation_date = p_donation_date,
 	volume_ml = p_volume_ml,
 	person_id = p_person_id,
 	facilitator_id = p_facilitator_id
 	WHERE donor_id = p_donor_id;
+commit;
 END //
 DELIMITER ;
 
 -- Delete Spesific Donor Data
+DELIMITER //
 CREATE PROCEDURE DeleteDonor(
 	IN p_donor_id INT
 )
-BEGIN
+begin
+	start transaction;
 	DELETE FROM donor
 	WHERE donor_id = p_donor_id;
-END //
-DELIMITER ;
-
--- Sum Donor
-DELIMITER //
-CREATE FUNCTION SumDonor()
-RETURNS INT
-DETERMINISTIC
-BEGIN
-    DECLARE total_volume INT;  
-    	SELECT SUM(volume_ml) INTO total_volume FROM donor;
-	RETURN total_volume;
+	commit;
 END //
 DELIMITER ;
 
 -- Create Transfusion
-SELECT * from transfusion;
 DELIMITER //
 CREATE PROCEDURE CreateTransfusion(
 	IN p_transfusion_date DATE,
 	IN p_volume_ml INT,
-	In p_donor_id INT,
 	IN p_facilitator_id INT,
 	IN p_person_id INT
 )
-BEGIN
-	INSERT INTO transfusion (transfusion_date, volume_ml, donor_id, facilitator_id, person_id)
-	VALUES (p_transfusion_date , p_volume_ml, p_donor_id, p_facilitator_id, p_person_id);
+begin
+	start transaction;
+	INSERT INTO transfusion (transfusion_date, volume_ml, facilitator_id, person_id)
+	VALUES (p_transfusion_date , p_volume_ml, p_facilitator_id, p_person_id);
+	commit;
 END // 
 DELIMITER ;
 
 -- Read All Transfusion
 DELIMITER //
-CREATE PROCEDURE ReadTransfusion()
-BEGIN
-	SELECT * FROM transfusion;
-END //
-DELIMITER ;
-
--- Read Transfusion By Id
-DELIMITER //
-CREATE PROCEDURE ReadTransfusionById(
-	IN p_transfusion_id INT
+CREATE PROCEDURE ReadTransfusion(
+	in p_transfusion_id INT
 )
-BEGIN
+begin
+	if p_transfusion_id is null then
+	SELECT * FROM transfusion;
+	else
 	SELECT * FROM transfusion
-	WHERE transfusion_id = p_transfusion_id;
+	where transfusion_id = p_transfusion_id;
+	end if;
 END //
 DELIMITER ;
 
@@ -466,40 +463,31 @@ CREATE PROCEDURE UpdateTransfusion(
 	IN p_transfusion_id INT,
 	IN p_transfusion_date DATE,
 	IN p_volume_ml INT,
-	In p_donor_id INT,
 	IN p_facilitator_id INT,
 	IN p_person_id INT
 )
-BEGIN
+begin
+	start transaction;
 	UPDATE transfusion SET
 	transfusion_date = p_transfusion_date,
 	volume_ml = p_volume_ml,
-	donor_id = p_donor_id,
 	facilitator_id = p_facilitator_id,
 	person_id = p_person_id
 	WHERE transfusion_id = p_transfusion_id;
+	commit;
 END //
 DELIMITER ;
 
 -- Delete Spesific Transfusion Data
+DELIMITER //
 CREATE PROCEDURE DeleteTransfusion(
 	IN p_transfusion_id INT
 )
-BEGIN
+begin
+	start transaction;
 	DELETE FROM transfusion
 	WHERE transfusion_id = p_transfusion_id;
-END //
-DELIMITER ;
-
--- Sum Transfusion
-DELIMITER //
-CREATE FUNCTION SumTransfusion()
-RETURNS INT
-DETERMINISTIC
-BEGIN
-    DECLARE total_volume INT;  
-    	SELECT SUM(volume_ml) INTO total_volume FROM transfusion;
-	RETURN total_volume;
+	commit;
 END //
 DELIMITER ;
 
@@ -534,23 +522,17 @@ BEGIN
     END IF;
 END //
 DELIMITER ;
-CALL CreatePerson("John Doe",42, "O+","Male","606 Six St","6969696969",null);
 
 -- Read Person
 DELIMITER //
-CREATE PROCEDURE ReadPerson()
-BEGIN
+CREATE PROCEDURE ReadPerson(IN p_person_id INT)
+begin
+	if p_person_id is null then
 	SELECT * FROM person;
-END //
-DELIMITER ;
-
--- Read Person By Id
-CREATE PROCEDURE ReadPersonById(
-	IN p_person_id INT
-)
-BEGIN
+	else 
 	SELECT * FROM person
 	WHERE person_id = p_person_id;
+	end if;
 END //
 DELIMITER ;
 
@@ -566,7 +548,8 @@ CREATE PROCEDURE UpdatePerson(
     IN p_contact VARCHAR(255),
     IN p_account_id INT
 )
-BEGIN
+begin
+	start transaction;
 	UPDATE person SET
 	full_name  = p_full_name,
     age = p_age,
@@ -575,6 +558,7 @@ BEGIN
     address  = p_address,
     contact = p_contact
     WHERE person_id = p_person_id;
+   	commit;
 END //
 DELIMITER ;
 
@@ -583,41 +567,40 @@ DELIMITER //
 CREATE PROCEDURE DeletePerson(
 	IN p_person_id INT
 )
-BEGIN
+begin
+	start transaction;
 	DELETE FROM person
 	WHERE person_id = p_person_id;
+	commit;
 END //
 DELIMITER ;
 
 -- Create User
 DELIMITER //
 CREATE PROCEDURE CreateAccount(
+	in p_username VARCHAR(255),
 	IN p_email VARCHAR(255),
 	IN p_password VARCHAR(255),
 	IN p_role_id INT
 )
-BEGIN
-	INSERT INTO account (email, password, role_id)
-	VALUES (p_email, p_password, p_role_id);
+begin
+	start transaction;
+	INSERT INTO account (username, email, password, role_id)
+	VALUES (p_username, p_email, p_password, p_role_id);
+commit;
 END //
 DELIMITER ;
 
 -- Read User 
 DELIMITER //
-CREATE PROCEDURE ReadAccount()
-BEGIN
+CREATE PROCEDURE ReadAccount(IN p_account_id INT)
+begin
+	if p_account_id is null then
 	SELECT * FROM account;
-END //
-DELIMITER ;
-
--- Read User By Id 
-DELIMITER //
-CREATE PROCEDURE ReadAccountById(
-	IN p_account_id INT
-)
-BEGIN
+	else
 	SELECT * FROM account
 	WHERE account_id = p_account_id;
+	end if;
 END //
 DELIMITER ;
 
@@ -629,12 +612,14 @@ CREATE PROCEDURE UpdateAccount(
 	IN p_password VARCHAR(255),
 	IN p_role_id INT
 )
-BEGIN
+begin
+	start transaction;
 	UPDATE account SET
 	p_email = email,
 	p_password = password,
 	role_id = p_role_id
 	WHERE account_id = p_account_id;
+	commit;
 END //
 DELIMITER ;
 
@@ -643,10 +628,10 @@ DELIMITER //
 CREATE PROCEDURE DeleteAccount(
 	IN p_account_id INT
 )
-BEGIN
+begin
+	start transaction;
 	DELETE FROM account
 	WHERE account_id = p_account_id;
+	commit;
 END //
 DELIMITER ;
-
-SELECT * FROM account;

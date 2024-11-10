@@ -3,8 +3,6 @@ import {
   createStok,
   deleteStock,
   readStock,
-  readStockById,
-  readSumStock,
   updateStock,
 } from "../controller/stok.js";
 
@@ -13,7 +11,6 @@ const router = express.Router();
 router.use(express.json());
 
 router.route("/").get(readStock).post(createStok);
-router.route("/sum").get(readSumStock);
-router.route("/:id").get(readStockById).put(updateStock).delete(deleteStock);
+router.route("/:id").get(readStock).put(updateStock).delete(deleteStock);
 
 export default router;
