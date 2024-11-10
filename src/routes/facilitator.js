@@ -3,7 +3,6 @@ import {
   createFacilitator,
   deleteFacilitator,
   getFacilitator,
-  getFacilitatorById,
   getFacilitatorByType,
   getFacilitatorDonor,
   getFacilitatorStock,
@@ -15,18 +14,17 @@ const router = express.Router();
 // Middleware to parse JSON bodies
 router.use(express.json());
 
+router.route("/").get(getFacilitator).post(createFacilitator);
+
 router.route("/stock").get(getFacilitatorStock);
 router.route("/donor").get(getFacilitatorDonor);
 router.route("/transfusion").get(getFacilitatorTransfusion);
+router.route("/type").get(getFacilitatorByType);
 
 router
   .route("/:id")
-  .get(getFacilitatorById)
+  .get(getFacilitator)
   .put(updateFacilitator)
   .delete(deleteFacilitator);
-
-router.route("/type/:type").get(getFacilitatorByType);
-
-router.route("/").get(getFacilitator).post(createFacilitator);
 
 export default router;
