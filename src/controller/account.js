@@ -16,12 +16,12 @@ export const readAccount = (req, res) => {
 };
 
 export const createAccount = (req, res) => {
-  const sql = "call CreateAccount(?, ?, ?, ?)";
-  const { username, email, password, role_id } = req.body;
-  if (!username || !email || !password || !role_id) {
+  const sql = "call CreateAccount(?, ?, ?)";
+  const { username, email, password } = req.body;
+  if (!username || !email || !password) {
     return res.status(400).json({ error: "All fields are required" });
   }
-  db.query(sql, [username, email, password, role_id], (err) => {
+  db.query(sql, [username, email, password], (err) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: "Database error" });
@@ -31,16 +31,16 @@ export const createAccount = (req, res) => {
 };
 
 export const updateAccount = (req, res) => {
-  const sql = "call UpdateAccount(?, ?, ?, ?, ?)";
+  const sql = "call UpdateAccount(?, ?, ?, ?)";
   const { id } = req.params;
-  const { username, email, password, role_id } = req.body;
+  const { username, email, password } = req.body;
   if (!id) {
     return res.status(400).json({ error: "Params must be a number" });
   }
-  if (!username || !email || !password || !role_id) {
+  if (!username || !email || !password) {
     return res.status(400).json({ error: "All fields are required" });
   }
-  db.query(sql, [id, username, email, password, role_id], (err) => {
+  db.query(sql, [id, username, email, password], (err) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: "Database error" });
