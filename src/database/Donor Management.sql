@@ -1,18 +1,13 @@
--- CREATE database Donor_Management; 
--- use Donor_Management;
+CREATE database Donor_Management; 
+use Donor_Management;
 -- DROP database Donor_Management;
-
-CREATE TABLE role (
-  role_id int PRIMARY KEY AUTO_INCREMENT,
-  role_name VARCHAR(255)
-);
 
 CREATE TABLE account (
   account_id int PRIMARY KEY AUTO_INCREMENT,
-  user_name varchar(255), 
+  username varchar(255), 
   email varchar(255),
   password varchar(255),
-  role_id int
+  is_admin boolean
 );
 
 CREATE TABLE person (
@@ -90,6 +85,156 @@ END //
 
 DELIMITER ;
 
+-- Read Facilitator Data (All or By ID)
+DELIMITER //
+CREATE PROCEDURE ReadFacilitator(
+    IN p_facilitator_id INT
+)
+begin
+	START TRANSACTION;
+    IF p_facilitator_id IS NULL THEN
+        SELECT facilitator_id, facilitator_name, facilitator_type, address, contact FROM `facilitator`;
+    ELSE
+        SELECT facilitator_id, facilitator_name, facilitator_type, address, contact FROM `facilitator`
+        WHERE `facilitator_id` = p_facilitator_id;
+    END IF;
+   commit;
+END //
+DELIMITER ;
+
+-- Read Facilitators by Type
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorByType(IN p_facilitator_type VARCHAR(255))
+begin
+	START TRANSACTION;
+    SELECT 
+        f.facilitator_type,
+        f.facilitator_name,
+        COUNT(d.donor_id) AS TotalDonors,
+        COUNT(t.transfusion_id) AS TotalTransfusions
+    FROM facilitator f
+    left JOIN donor d ON f.facilitator_id = d.facilitator_id
+    left JOIN transfusion t ON f.facilitator_id = t.facilitator_id
+    WHERE p_facilitator_type IS NULL OR f.facilitator_type = p_facilitator_type
+    GROUP BY f.facilitator_id, f.facilitator_name, f.facilitator_type;
+   commit;
+END //
+DELIMITER ;
+
+-- Read Blood Stock by Facilitator
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorStock()
+BEGIN
+    SELECT f.`facilitator_name`, s.`blood_type`, SUM(s.`volume_ml`) as total_volume
+    FROM `stock` s
+    JOIN `facilitator` f ON s.`facilitator_id` = f.`facilitator_id`
+    GROUP BY f.`facilitator_name`, s.`blood_type`
+    ORDER BY f.`facilitator_name`;
+END //
+DELIMITER ;
+
+-- Read Donor Data
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorDonor()
+begin
+    SELECT 
+        f.`facilitator_name`, 
+        d.`donation_date`, 
+        p.`full_name` AS `donor_name`, 
+        p.`blood_type`, 
+        d.`volume_ml`
+    FROM `donor` d
+    JOIN `person` p ON d.`person_id` = p.`person_id`
+    JOIN `facilitator` f ON d.`facilitator_id` = f.`facilitator_id`;
+END //
+DELIMITER ;
+
+-- Read Transfusion Data
+DELIMITER //
+CREATE PROCEDURE ReadFacilitatorTransfusion()
+BEGIN
+    SELECT 
+        f.`facilitator_name`, 
+        t.`transfusion_date`, 
+        p.`full_name` AS `recipient_name`, 
+        p.`blood_type`, 
+        t.`volume_ml`
+    FROM `transfusion` t
+    JOIN `person` p ON t.`person_id` = p.`person_id`
+    JOIN `facilitator` f ON t.`facilitator_id` = f.`facilitator_id`;
+END //
+DELIMITER ;
+
+-- Create Facilitator
+DELIMITER //
+CREATE PROCEDURE CreateFacilitator(
+    IN p_facilitator_name VARCHAR(255),
+    IN p_facilitator_type enum("Hospital","Clinic"),
+    IN p_address VARCHAR(255),
+    IN p_contact VARCHAR(255)
+)
+begin
+	START TRANSACTION;
+    INSERT INTO `facilitator` (`facilitator_name`, `facilitator_type`, `address`, `contact`) 
+    VALUES (p_facilitator_name, p_facilitator_type, p_address, p_contact);
+   commit;
+END //
+DELIMITER ;
+
+-- Update Specific Facilitator Data with Transaction
+DELIMITER //
+CREATE PROCEDURE UpdateFacilitator(
+    IN p_facilitator_id INT,
+    IN p_facilitator_name VARCHAR(255),
+    IN p_facilitator_type ENUM('Hospital', 'Clinic'),
+    IN p_address VARCHAR(255),
+    IN p_contact VARCHAR(255)
+)
+BEGIN
+    START TRANSACTION;
+    UPDATE `facilitator` 
+    SET 
+        `facilitator_name` = p_facilitator_name,
+        `facilitator_type` = p_facilitator_type,
+        `address` = p_address,
+        `contact` = p_contact
+    WHERE 
+        `facilitator_id` = p_facilitator_id;
+        commit;
+    END IF;
+END //
+DELIMITER ;
+
+-- Delete Specific Facilitator
+DELIMITER //
+CREATE PROCEDURE DeleteFacilitator(
+    IN p_facilitator_id INT
+)
+BEGIN
+    START TRANSACTION;
+    DELETE FROM `facilitator` 
+    WHERE `facilitator_id` = p_facilitator_id;
+        COMMIT;
+    END IF;
+END //
+DELIMITER ;
+
+-- Read Stock Data (All or By ID)
+DELIMITER //
+CREATE PROCEDURE ReadStock(
+    IN p_stock_id INT
+)
+begin
+	START transaction;
+    IF p_stock_id IS NULL THEN
+        SELECT stock_id, blood_type, volume_ml, facilitator_id FROM `stock`;
+    ELSE
+        SELECT stock_id, blood_type, volume_ml, facilitator_id FROM `stock` WHERE `stock_id` = p_stock_id;
+    END IF;
+   COMMIT;
+END //
+DELIMITER ;
+
 -- Create Stock
 DELIMITER //
 CREATE PROCEDURE CreateStock(
@@ -102,20 +247,6 @@ BEGIN
     INSERT INTO `stock` (`blood_type`, `volume_ml`, `facilitator_id`) 
     VALUES (p_blood_type, p_volume_ml, p_facilitator_id);
    	COMMIT;
-END //
-DELIMITER ;
-
--- Read Stock Data (All or By ID)
-DELIMITER //
-CREATE PROCEDURE ReadStock(
-    IN p_stock_id INT
-)
-BEGIN
-    IF p_stock_id IS NULL THEN
-        SELECT * FROM `stock`;
-    ELSE
-        SELECT * FROM `stock` WHERE `stock_id` = p_stock_id;
-    END IF;
 END //
 DELIMITER ;
 
@@ -147,22 +278,7 @@ begin
     DELETE FROM `stock` WHERE `stock_id` = p_stock_id;
     COMMIT;
 END //
-DELIMITER ;
-
--- Sum Stock
-DELIMITER //
-CREATE FUNCTION SumStock() 
-RETURNS VARCHAR(255)
-DETERMINISTIC
-BEGIN
-    DECLARE total_volume INT;
-    DECLARE result VARCHAR(255);
-    
-    SELECT SUM(volume_ml) INTO total_volume FROM stock;
-    SET result = CONCAT('Total Volume: ', total_volume);
-    RETURN result;
-END //
-DELIMITER ;
+DELIMITER ; 
 
 -- Update Stock on Donor Addition
 DELIMITER //
@@ -190,176 +306,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- Search fasilitator from stock
-DELIMITER //
-CREATE PROCEDURE ReadStockDetails(IN facilitatorID INT)
-BEGIN
-    DECLARE total_stock VARCHAR(255);
-    
-    -- Call the SumStock function
-    SET total_stock = SumStock();
-    
-    -- Select facilitator and stock details
-    SELECT 
-        f.facilitator_name, 
-        f.facilitator_type, 
-        s.blood_type, 
-        s.volume_ml, 
-        total_stock AS total_volume
-    FROM 
-        stock s
-    JOIN 
-        facilitator f 
-    ON 
-        f.facilitator_id = s.facilitator_id
-    WHERE 
-        s.facilitator_id = facilitatorID
-    GROUP BY 
-        s.blood_type;
-END //
-DELIMITER ;
 
--- Create Facilitator
-DELIMITER //
-CREATE PROCEDURE CreateFacilitator(
-    IN p_facilitator_name VARCHAR(255),
-    IN p_facilitator_type enum("Hospital","Clinic"),
-    IN p_address VARCHAR(255),
-    IN p_contact VARCHAR(255)
-)
-begin
-	START TRANSACTION;
-    INSERT INTO `facilitator` (`facilitator_name`, `facilitator_type`, `address`, `contact`) 
-    VALUES (p_facilitator_name, p_facilitator_type, p_address, p_contact);
-   commit;
-END //
-DELIMITER ;
-
--- Read Facilitator Data (All or By ID)
-DELIMITER //
-CREATE PROCEDURE ReadFacilitator(
-    IN p_facilitator_id INT
-)
-BEGIN
-    IF p_facilitator_id IS NULL THEN
-        SELECT * FROM `facilitator`;
-    ELSE
-        SELECT * FROM `facilitator`
-        WHERE `facilitator_id` = p_facilitator_id;
-    END IF;
-END //
-DELIMITER ;
-call ReadFacilitator(null);
-
--- Update Specific Facilitator Data with Transaction
-DELIMITER //
-CREATE PROCEDURE UpdateFacilitator(
-    IN p_facilitator_id INT,
-    IN p_facilitator_name VARCHAR(255),
-    IN p_facilitator_type ENUM('Hospital', 'Clinic'),
-    IN p_address VARCHAR(255),
-    IN p_contact VARCHAR(255)
-)
-BEGIN
-    START TRANSACTION;
-    
-    UPDATE `facilitator` 
-    SET 
-        `facilitator_name` = p_facilitator_name,
-        `facilitator_type` = p_facilitator_type,
-        `address` = p_address,
-        `contact` = p_contact
-    WHERE 
-        `facilitator_id` = p_facilitator_id;
-    
-    -- Error handling
-    IF ROW_COUNT() = 0 THEN
-        ROLLBACK; -- Undo changes if no rows are updated
-    ELSE
-        COMMIT; -- Confirm changes if successful
-    END IF;
-END //
-DELIMITER ;
-
--- Delete Specific Facilitator Data with Transaction and Error Handling
-DELIMITER //
-CREATE PROCEDURE DeleteFacilitator(
-    IN p_facilitator_id INT
-)
-BEGIN
-    START TRANSACTION;
-
-    DELETE FROM `facilitator` 
-    WHERE `facilitator_id` = p_facilitator_id;
-
-    -- Error handling
-    IF ROW_COUNT() = 0 THEN
-        ROLLBACK; -- Undo transaction if no rows were deleted
-    ELSE
-        COMMIT; -- Confirm changes if deletion is successful
-    END IF;
-END //
-DELIMITER ;
-
--- List Facilitators by Type
-DELIMITER //
-CREATE PROCEDURE ReadFacilitatorByType(IN p_facilitator_type VARCHAR(255))
-BEGIN
-    SELECT 
-        f.facilitator_type,
-        f.facilitator_name,
-        COUNT(d.donor_id) AS TotalDonors,
-        COUNT(t.transfusion_id) AS TotalTransfusions
-    FROM facilitator f
-    LEFT JOIN donor d ON f.facilitator_id = d.facilitator_id
-    LEFT JOIN transfusion t ON f.facilitator_id = t.facilitator_id
-    WHERE p_facilitator_type IS NULL OR f.facilitator_type = p_facilitator_type
-    GROUP BY f.facilitator_id, f.facilitator_name, f.facilitator_type;
-END //
-DELIMITER ;
-
--- List All Blood Stock by Facilitator
-DELIMITER //
-CREATE PROCEDURE ReadFacilitatorStock()
-BEGIN
-    SELECT f.`facilitator_name`, s.`blood_type`, s.`volume_ml`
-    FROM `stock` s
-    JOIN `facilitator` f ON s.`facilitator_id` = f.`facilitator_id`
-    ORDER BY f.`facilitator_name`;
-END //
-DELIMITER ;
-
--- List Donor Data
-DELIMITER //
-CREATE PROCEDURE ReadFacilitatorDonor()
-BEGIN
-    SELECT 
-        f.`facilitator_name`, 
-        d.`donation_date`, 
-        p.`full_name` AS `donor_name`, 
-        p.`blood_type`, 
-        d.`volume_ml`
-    FROM `donor` d
-    JOIN `person` p ON d.`person_id` = p.`person_id`
-    JOIN `facilitator` f ON d.`facilitator_id` = f.`facilitator_id`;
-END //
-DELIMITER ;
-
--- List Transfusion Data
-DELIMITER //
-CREATE PROCEDURE ReadFacilitatorTransfusion()
-BEGIN
-    SELECT 
-        f.`facilitator_name`, 
-        t.`transfusion_date`, 
-        p.`full_name` AS `recipient_name`, 
-        p.`blood_type`, 
-        t.`volume_ml`
-    FROM `transfusion` t
-    JOIN `person` p ON t.`person_id` = p.`person_id`
-    JOIN `facilitator` f ON t.`facilitator_id` = f.`facilitator_id`;
-END //
-DELIMITER ;
 
 -- Create Donor
 DELIMITER //
@@ -384,9 +331,9 @@ create procedure ReadDonor(
 )
 BEGIN
     IF p_donor_id IS NULL THEN
-        SELECT * FROM `donor`;
+        SELECT donor_id, donation_date, volume_ml, person_id, facilitator_id FROM `donor`;
     ELSE
-        SELECT * FROM `donor`
+        SELECT donor_id, donation_date, volume_ml, person_id, facilitator_id FROM `donor`
         WHERE `donor_id` = p_donor_id;
     END IF;
 END //
@@ -449,9 +396,9 @@ CREATE PROCEDURE ReadTransfusion(
 )
 begin
 	if p_transfusion_id is null then
-	SELECT * FROM transfusion;
+	SELECT transfusion_id, transfusion_date, volume_ml, facilitator_id, person_id FROM transfusion;
 	else
-	SELECT * FROM transfusion
+	SELECT transfusion_id, transfusion_date, volume_ml, facilitator_id, person_id FROM transfusion
 	where transfusion_id = p_transfusion_id;
 	end if;
 END //
@@ -491,6 +438,17 @@ begin
 END //
 DELIMITER ;
 
+-- Check Age
+DELIMITER //
+CREATE FUNCTION CheckAge(p_age INT)
+RETURNS BOOLEAN
+DETERMINISTIC
+BEGIN
+    RETURN p_age >= 18 AND p_age <= 60;
+END //
+DELIMITER ;
+
+
 -- Create Person
 DELIMITER //
 CREATE PROCEDURE CreatePerson(
@@ -506,8 +464,8 @@ BEGIN
     -- Start transaction to ensure atomicity
     START TRANSACTION;
 
-    -- Check age eligibility
-    IF p_age >= 18 AND p_age <= 60 THEN
+    -- Check age eligibility using CheckAge function
+    IF CheckAge(p_age) THEN
         -- If eligible, insert data
         INSERT INTO person (full_name, age, blood_type, gender, address, contact, account_id)
         VALUES (p_full_name, p_age, p_blood_type, p_gender, p_address, p_contact, p_account_id);
@@ -528,9 +486,9 @@ DELIMITER //
 CREATE PROCEDURE ReadPerson(IN p_person_id INT)
 begin
 	if p_person_id is null then
-	SELECT * FROM person;
+	SELECT person_id, full_name, age, blood_type, gender, address, contact, account_id FROM person;
 	else 
-	SELECT * FROM person
+	SELECT person_id, full_name, age, blood_type, gender, address, contact, account_id FROM person
 	WHERE person_id = p_person_id;
 	end if;
 END //
@@ -539,8 +497,8 @@ DELIMITER ;
 -- Update Person By Id
 DELIMITER //
 CREATE PROCEDURE UpdatePerson(
-	IN p_person_id INT,
-	IN p_full_name VARCHAR(255),
+    IN p_person_id INT,
+    IN p_full_name VARCHAR(255),
     IN p_age INT,
     IN p_blood_type ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'),
     IN p_gender ENUM('Male', 'Female'),
@@ -548,19 +506,34 @@ CREATE PROCEDURE UpdatePerson(
     IN p_contact VARCHAR(255),
     IN p_account_id INT
 )
-begin
-	start transaction;
-	UPDATE person SET
-	full_name  = p_full_name,
-    age = p_age,
-    blood_type = p_blood_type,
-    gender = p_gender ,
-    address  = p_address,
-    contact = p_contact
-    WHERE person_id = p_person_id;
-   	commit;
+BEGIN
+    -- Start transaction to ensure atomicity
+    START TRANSACTION;
+
+    -- Check age eligibility using CheckAge function
+    IF CheckAge(p_age) THEN
+        -- If eligible, update data
+        UPDATE person SET
+            full_name = p_full_name,
+            age = p_age,
+            blood_type = p_blood_type,
+            gender = p_gender,
+            address = p_address,
+            contact = p_contact,
+            account_id = p_account_id
+        WHERE person_id = p_person_id;
+
+        -- Commit transaction
+        COMMIT;
+    ELSE
+        -- Rollback for invalid age
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Age must be between 18 and 60.';
+    END IF;
 END //
 DELIMITER ;
+
 
 -- Delete Person By Id
 DELIMITER //
@@ -581,43 +554,47 @@ CREATE PROCEDURE CreateAccount(
 	in p_username VARCHAR(255),
 	IN p_email VARCHAR(255),
 	IN p_password VARCHAR(255),
-	IN p_role_id INT
+	IN p_is_admin boolean
 )
 begin
 	start transaction;
-	INSERT INTO account (username, email, password, role_id)
-	VALUES (p_username, p_email, p_password, p_role_id);
+	INSERT INTO account (username, email, password, is_admin)
+	VALUES (p_username, p_email, p_password, p_is_admin);
 commit;
 END //
 DELIMITER ;
+
+call CreateAccount("Halan", "halan@testing.ccom", "91893208192038120", false);
 
 -- Read User 
 DELIMITER //
 CREATE PROCEDURE ReadAccount(IN p_account_id INT)
 begin
 	if p_account_id is null then
-	SELECT * FROM account;
+	SELECT account_id, username, email, password, is_admin FROM account;
 	else
-	SELECT * FROM account
+	SELECT account_id, username, email, password, is_admin FROM account
 	WHERE account_id = p_account_id;
 	end if;
 END //
 DELIMITER ;
 
+call ReadAccount(NULL);
+
 -- Update User 
 DELIMITER //
 CREATE PROCEDURE UpdateAccount(
 	IN p_account_id INT,
+	IN p_username VARCHAR(255),
 	IN p_email VARCHAR(255),
-	IN p_password VARCHAR(255),
-	IN p_role_id INT
+	IN p_password VARCHAR(255)
 )
 begin
 	start transaction;
-	UPDATE account SET
+	UPDATE account set
+	p_username = username,
 	p_email = email,
-	p_password = password,
-	role_id = p_role_id
+	p_password = password
 	WHERE account_id = p_account_id;
 	commit;
 END //
