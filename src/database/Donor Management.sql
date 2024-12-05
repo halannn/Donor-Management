@@ -7,7 +7,7 @@ USE Donor_Management;
 CREATE TABLE account (
     account_id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(255), 
-    email VARCHAR(255),
+    email VARCHAR(255) UNIQUE,
     password VARCHAR(255),
     is_admin BOOLEAN
 );
@@ -95,6 +95,18 @@ END //
 
 DELIMITER ;
 
+-- Function: Check contact
+DELIMITER //
+
+CREATE FUNCTION CheckValidContact(p_contact VARCHAR(20)) 
+RETURNS BOOLEAN
+DETERMINISTIC
+BEGIN
+    RETURN LENGTH(p_contact) >= 10;
+END //
+
+DELIMITER ;
+
 -- Procedure: Read Facilitator Data (All or By ID)
 DELIMITER //
 CREATE PROCEDURE ReadFacilitator(
@@ -159,7 +171,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- Procedure: Read Donor Data by Facilitator
+-- Procedure: Read Donor Data
 DELIMITER //
 CREATE PROCEDURE ReadFacilitatorDonor()
 BEGIN
@@ -179,7 +191,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- Procedure: Read Transfusion Data by Facilitator
+-- Procedure: Read Transfusion Data
 DELIMITER //
 CREATE PROCEDURE ReadFacilitatorTransfusion()
 BEGIN
@@ -210,6 +222,11 @@ CREATE PROCEDURE CreateFacilitator(
 BEGIN
     START TRANSACTION;
     
+	IF NOT CheckValidContact(p_contact) THEN
+	    SIGNAL SQLSTATE '45000'
+	        SET MESSAGE_TEXT = 'Contact must have at least 10 digits';
+	END IF;  
+   
     INSERT INTO facilitator (facilitator_name, facilitator_type, address, contact) 
     VALUES (p_facilitator_name, p_facilitator_type, p_address, p_contact);
     
@@ -217,7 +234,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- Procedure: Update Specific Facilitator Data
+-- Procedure: Update Specific Facilitator Data with Transaction
 DELIMITER //
 CREATE PROCEDURE UpdateFacilitator(
     IN p_facilitator_id INT,
@@ -229,6 +246,11 @@ CREATE PROCEDURE UpdateFacilitator(
 BEGIN
     START TRANSACTION;
     
+	IF NOT CheckValidContact(p_contact) THEN
+	    SIGNAL SQLSTATE '45000'
+	        SET MESSAGE_TEXT = 'Contact must have at least 10 digits';
+	END IF;   
+   
     UPDATE facilitator 
     SET 
         facilitator_name = p_facilitator_name,
@@ -287,10 +309,15 @@ CREATE PROCEDURE CreateStock(
 BEGIN
     START TRANSACTION;
     
-    INSERT INTO stock (blood_type, volume_ml, facilitator_id) 
-    VALUES (p_blood_type, p_volume_ml, p_facilitator_id);
-    
-    COMMIT;
+    IF NOT CheckBloodType(p_blood_type) THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'Invalid blood type. Allowed types are A+, A-, B+, B-, AB+, AB-, O+, O-.';
+    ELSE
+        INSERT INTO stock (blood_type, volume_ml, facilitator_id) 
+        VALUES (p_blood_type, p_volume_ml, p_facilitator_id);
+        COMMIT;
+    END IF;
 END //
 DELIMITER ;
 
@@ -298,19 +325,24 @@ DELIMITER ;
 DELIMITER //
 CREATE PROCEDURE UpdateStock(
     IN p_stock_id INT,
-    IN p_blood_type ENUM("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"), 
+    IN p_blood_type VARCHAR(3), 
     IN p_volume_ml INT
 )
 BEGIN
     START TRANSACTION;
     
-    UPDATE stock
-    SET 
-        blood_type = p_blood_type,
-        volume_ml = p_volume_ml
-    WHERE stock_id = p_stock_id;
-    
-    COMMIT;
+    IF NOT CheckBloodType(p_blood_type) THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'Invalid blood type. Allowed types are A+, A-, B+, B-, AB+, AB-, O+, O-.';
+    ELSE
+        UPDATE stock
+        SET 
+            blood_type = p_blood_type,
+            volume_ml = p_volume_ml
+        WHERE stock_id = p_stock_id;
+        COMMIT;
+    END IF;
 END //
 DELIMITER ;
 
@@ -525,47 +557,62 @@ BEGIN
 END //
 DELIMITER ;
 
+-- Function: Check Blood Type
+DELIMITER //
+CREATE FUNCTION CheckBloodType(p_blood_type VARCHAR(3))
+RETURNS BOOLEAN
+DETERMINISTIC
+BEGIN
+    RETURN p_blood_type IN ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-');
+END //
+DELIMITER ;
+
 -- Procedure: Create Person
 DELIMITER //
 CREATE PROCEDURE CreatePerson(
     IN p_full_name VARCHAR(255),
     IN p_age INT,
-    IN p_blood_type ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'),
+    IN p_blood_type VARCHAR(3),
     IN p_gender ENUM('Male', 'Female'),
     IN p_address VARCHAR(255),
     IN p_contact VARCHAR(255),
     IN p_account_id INT
 )
 BEGIN
-    -- Start transaction to ensure atomicity
     START TRANSACTION;
 
-    -- Check age eligibility using CheckAge function
-    IF CheckAge(p_age) THEN
-        -- If eligible, insert data
-        INSERT INTO person (
-            full_name, 
-            age, 
-            blood_type, 
-            gender, 
-            address, 
-            contact, 
-            account_id
-        )
-        VALUES (
-            p_full_name, 
-            p_age, 
-            p_blood_type, 
-            p_gender, 
-            p_address, 
-            p_contact, 
-            p_account_id
-        );
+    IF CheckAge(p_age) then
+		IF NOT CheckValidContact(p_contact) THEN
+		    SIGNAL SQLSTATE '45000'
+		        SET MESSAGE_TEXT = 'Contact must have at least 10 digits';
+		END IF;
 
-        -- Commit transaction
-        COMMIT;
+        IF NOT CheckBloodType(p_blood_type) THEN
+            ROLLBACK;
+            SIGNAL SQLSTATE '45000' 
+                SET MESSAGE_TEXT = 'Invalid blood type. Allowed types are A+, A-, B+, B-, AB+, AB-, O+, O-.';
+        ELSE
+            INSERT INTO person (
+                full_name, 
+                age, 
+                blood_type, 
+                gender, 
+                address, 
+                contact, 
+                account_id
+            )
+            VALUES (
+                p_full_name, 
+                p_age, 
+                p_blood_type, 
+                p_gender, 
+                p_address, 
+                p_contact, 
+                p_account_id
+            );
+            COMMIT;
+        END IF;
     ELSE
-        -- Rollback for invalid age
         ROLLBACK;
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Age must be between 18 and 60.';
@@ -616,34 +663,39 @@ CREATE PROCEDURE UpdatePerson(
     IN p_person_id INT,
     IN p_full_name VARCHAR(255),
     IN p_age INT,
-    IN p_blood_type ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'),
+    IN p_blood_type VARCHAR(3),
     IN p_gender ENUM('Male', 'Female'),
     IN p_address VARCHAR(255),
     IN p_contact VARCHAR(255),
     IN p_account_id INT
 )
 BEGIN
-    -- Start transaction to ensure atomicity
     START TRANSACTION;
 
-    -- Check age eligibility using CheckAge function
-    IF CheckAge(p_age) THEN
-        -- If eligible, update data
-        UPDATE person 
-        SET
-            full_name = p_full_name,
-            age = p_age,
-            blood_type = p_blood_type,
-            gender = p_gender,
-            address = p_address,
-            contact = p_contact,
-            account_id = p_account_id
-        WHERE person_id = p_person_id;
+    IF CheckAge(p_age) then
+		IF NOT CheckValidContact(p_contact) THEN
+		    SIGNAL SQLSTATE '45000'
+		        SET MESSAGE_TEXT = 'Contact must have at least 10 digits';
+		END IF;
 
-        -- Commit transaction
-        COMMIT;
+        IF NOT CheckBloodType(p_blood_type) THEN
+            ROLLBACK;
+            SIGNAL SQLSTATE '45000' 
+                SET MESSAGE_TEXT = 'Invalid blood type. Allowed types are A+, A-, B+, B-, AB+, AB-, O+, O-.';
+        ELSE
+            UPDATE person 
+            SET
+                full_name = p_full_name,
+                age = p_age,
+                blood_type = p_blood_type,
+                gender = p_gender,
+                address = p_address,
+                contact = p_contact,
+                account_id = p_account_id
+            WHERE person_id = p_person_id;
+            COMMIT;
+        END IF;
     ELSE
-        -- Rollback for invalid age
         ROLLBACK;
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Age must be between 18 and 60.';
@@ -666,6 +718,30 @@ BEGIN
 END //
 DELIMITER ;
 
+-- Function: Check Email 
+DELIMITER //
+
+CREATE FUNCTION CheckValidEmail(p_email VARCHAR(255)) 
+RETURNS BOOLEAN
+DETERMINISTIC
+BEGIN
+    RETURN p_email LIKE '%@%';
+END //
+
+DELIMITER ;
+
+-- Function: Check Password
+DELIMITER //
+
+CREATE FUNCTION CheckValidPassword(p_password VARCHAR(255)) 
+RETURNS BOOLEAN
+DETERMINISTIC
+BEGIN
+    RETURN LENGTH(p_password) >= 8;
+END //
+
+DELIMITER ;
+
 -- Procedure: Create Account (User)
 DELIMITER //
 CREATE PROCEDURE CreateAccount(
@@ -675,7 +751,19 @@ CREATE PROCEDURE CreateAccount(
 )
 BEGIN
     START TRANSACTION;
-    
+   
+    IF NOT CheckValidEmail(p_email) THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'Invalid email, must contain "@"';
+    END IF;
+
+    IF NOT CheckValidPassword(p_password) THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'Password must be more than 8 characters';
+    END IF;   
+   
     INSERT INTO account (username, email, password)
     VALUES (p_username, p_email, p_password);
     
@@ -714,9 +802,6 @@ BEGIN
 END //
 DELIMITER ;
 
--- Example Call to ReadAccount Procedure
--- CALL ReadAccount(NULL);
-
 -- Procedure: Update Account (User)
 DELIMITER //
 CREATE PROCEDURE UpdateAccount(
@@ -727,6 +812,18 @@ CREATE PROCEDURE UpdateAccount(
 )
 BEGIN
     START TRANSACTION;
+   
+    IF NOT CheckValidEmail(p_email) THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'Invalid email, must contain "@"';
+    END IF;
+
+    IF NOT CheckValidPassword(p_password) THEN
+        ROLLBACK;
+        SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'Password must be more than 8 characters';
+    END IF;   
     
     UPDATE account 
     SET
@@ -752,4 +849,27 @@ BEGIN
     
     COMMIT;
 END //
+DELIMITER ;
+
+-- Procedure: Login Account (User)
+DELIMITER //
+
+CREATE PROCEDURE LoginAccount(
+    IN p_username VARCHAR(255),
+    IN p_password VARCHAR(255)
+)
+begin
+	START TRANSACTION;
+    SELECT 
+        a.account_id,
+        a.username,
+        a.is_admin
+    FROM 
+        account a
+    WHERE 
+        a.username = p_username
+        AND a.password = p_password;
+    COMMIT;
+END //
+
 DELIMITER ;

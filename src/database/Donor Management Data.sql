@@ -26,7 +26,7 @@ INSERT INTO account (username, email, password, is_admin) VALUES
 ('user6', 'user6@example.com', 'password6', false),
 ('user7', 'user7@example.com', 'password7', false),
 ('user8', 'user8@example.com', 'password8', false),
-('user9', 'user9@example.com', 'password9', false),
+('user9', 'user9@example.com	', 'password9', false),
 ('user10', 'user10@example.com', 'password10', false),
 ('user11', 'user11@example.com', 'password11', false),
 ('user12', 'user12@example.com', 'password12', false),
