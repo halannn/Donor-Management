@@ -23,8 +23,7 @@ export const createAccount = (req, res) => {
   }
   db.query(sql, [username, email, password], (err) => {
     if (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Database error" });
+      return res.status(500).json({ error: err.sqlMessage });
     }
     res.status(201).json({ message: "Account created successfully" });
   });

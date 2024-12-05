@@ -128,48 +128,79 @@ BEGIN
 END //
 DELIMITER ;
 
+-- View: Facilitators by Type
+CREATE VIEW ViewFacilitatorsByType AS
+SELECT 
+    f.facilitator_type,
+    f.facilitator_name,
+    COUNT(d.donor_id) AS TotalDonors,
+    COUNT(t.transfusion_id) AS TotalTransfusions
+FROM facilitator f
+LEFT JOIN donor d ON f.facilitator_id = d.facilitator_id
+LEFT JOIN transfusion t ON f.facilitator_id = t.facilitator_id
+GROUP BY f.facilitator_id, f.facilitator_name, f.facilitator_type;
+
 -- Procedure: Read Facilitators by Type
 DELIMITER //
+
 CREATE PROCEDURE ReadFacilitatorByType(
     IN p_facilitator_type VARCHAR(255)
 )
 BEGIN
-    START TRANSACTION;
-    
+	START TRANSACTION;
     SELECT 
-        f.facilitator_type,
-        f.facilitator_name,
-        COUNT(d.donor_id) AS TotalDonors,
-        COUNT(t.transfusion_id) AS TotalTransfusions
-    FROM facilitator f
-    LEFT JOIN donor d ON f.facilitator_id = d.facilitator_id
-    LEFT JOIN transfusion t ON f.facilitator_id = t.facilitator_id
-    WHERE p_facilitator_type IS NULL 
-       OR f.facilitator_type = p_facilitator_type
-    GROUP BY f.facilitator_id, f.facilitator_name, f.facilitator_type;
-    
+        facilitator_type,
+        facilitator_name,
+        TotalDonors,
+        TotalTransfusions
+    FROM ViewFacilitatorsByType
+    WHERE facilitator_type = p_facilitator_type
+    OR p_facilitator_type IS NULL;
     COMMIT;
 END //
+
 DELIMITER ;
+
+-- View: Blood Stock by Facilitator
+CREATE VIEW ViewFacilitatorStock AS
+SELECT 
+    f.facilitator_name, 
+    s.blood_type, 
+    SUM(s.volume_ml) AS total_volume
+FROM stock s
+JOIN facilitator f ON s.facilitator_id = f.facilitator_id
+GROUP BY f.facilitator_name, s.blood_type
+ORDER BY f.facilitator_name;
 
 -- Procedure: Read Blood Stock by Facilitator
 DELIMITER //
+
 CREATE PROCEDURE ReadFacilitatorStock()
-BEGIN
-    START TRANSACTION;
-    
+begin
+	START TRANSACTION;
+
     SELECT 
-        f.facilitator_name, 
-        s.blood_type, 
-        SUM(s.volume_ml) AS total_volume
-    FROM stock s
-    JOIN facilitator f ON s.facilitator_id = f.facilitator_id
-    GROUP BY f.facilitator_name, s.blood_type
-    ORDER BY f.facilitator_name;
-    
+        facilitator_name, 
+        blood_type, 
+        total_volume
+    FROM ViewFacilitatorStock;
+   
     COMMIT;
 END //
+
 DELIMITER ;
+
+-- View: Donor Data by Facilitator
+CREATE VIEW ViewFacilitatorDonor AS
+SELECT 
+    f.facilitator_name, 
+    d.donation_date, 
+    p.full_name AS donor_name, 
+    p.blood_type, 
+    d.volume_ml
+FROM donor d
+JOIN person p ON d.person_id = p.person_id
+JOIN facilitator f ON d.facilitator_id = f.facilitator_id;
 
 -- Procedure: Read Donor Data
 DELIMITER //
@@ -177,19 +208,29 @@ CREATE PROCEDURE ReadFacilitatorDonor()
 BEGIN
     START TRANSACTION;
     
-    SELECT 
-        f.facilitator_name, 
-        d.donation_date, 
-        p.full_name AS donor_name, 
-        p.blood_type, 
-        d.volume_ml
-    FROM donor d
-    JOIN person p ON d.person_id = p.person_id
-    JOIN facilitator f ON d.facilitator_id = f.facilitator_id;
+	SELECT 
+        facilitator_name, 
+        donation_date, 
+        donor_name, 
+        blood_type, 
+        volume_ml
+    FROM ViewFacilitatorDonor;
     
     COMMIT;
 END //
 DELIMITER ;
+
+-- View: Transfusion Data by Facilitator
+CREATE VIEW ViewFacilitatorTransfusion AS
+SELECT 
+    f.facilitator_name, 
+    t.transfusion_date, 
+    p.full_name AS recipient_name, 
+    p.blood_type, 
+    t.volume_ml
+FROM transfusion t
+JOIN person p ON t.person_id = p.person_id
+JOIN facilitator f ON t.facilitator_id = f.facilitator_id;
 
 -- Procedure: Read Transfusion Data
 DELIMITER //
@@ -198,14 +239,12 @@ BEGIN
     START TRANSACTION;
     
     SELECT 
-        f.facilitator_name, 
-        t.transfusion_date, 
-        p.full_name AS recipient_name, 
-        p.blood_type, 
-        t.volume_ml
-    FROM transfusion t
-    JOIN person p ON t.person_id = p.person_id
-    JOIN facilitator f ON t.facilitator_id = f.facilitator_id;
+        facilitator_name, 
+        transfusion_date, 
+        recipient_name, 
+        blood_type, 
+        volume_ml
+    FROM ViewFacilitatorTransfusion;
     
     COMMIT;
 END //

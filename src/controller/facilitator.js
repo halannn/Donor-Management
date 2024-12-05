@@ -19,7 +19,7 @@ export const readFacilitatorByType = (req, res) => {
   const sql = "call ReadFacilitatorByType(?)";
   const { type } = req.query;
   db.query(sql, [type], (err, results) => {
-    if (err) return res.status(500).json({ message: "Database error" });
+    if (err) return res.status(500).json({ message: err });
     if (results.length === 0) {
       return res.status(400).json({ message: "Facilitator not found" });
     }
