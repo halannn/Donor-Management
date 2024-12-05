@@ -5,16 +5,20 @@ import {
   readTransfusion,
   updateTransfusion,
 } from "../controller/transfusion.js";
+import { verifyUser, verifyAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
 // Middleware to parse JSON bodies
 router.use(express.json());
 
-router.route("/").get(readTransfusion).post(createTransfusion);
+router
+  .route("/")
+  .get(verifyUser, readTransfusion)
+  .post(verifyAdmin, createTransfusion);
 router
   .route("/:id")
-  .get(readTransfusion)
-  .put(updateTransfusion)
-  .delete(deleteTransfusion);
+  .get(verifyUser, readTransfusion)
+  .put(verifyAdmin, updateTransfusion)
+  .delete(verifyAdmin, deleteTransfusion);
 
 export default router;

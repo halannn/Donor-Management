@@ -20,15 +20,15 @@ router
   .get(verifyUser, readFacilitator)
   .post(verifyAdmin, createFacilitator);
 
-router.route("/stock").get(readFacilitatorStock);
-router.route("/donor").get(readFacilitatorDonor);
-router.route("/transfusion").get(readFacilitatorTransfusion);
-router.route("/type").get(readFacilitatorByType);
+router.route("/stock").get(verifyUser, readFacilitatorStock);
+router.route("/donor").get(verifyUser, readFacilitatorDonor);
+router.route("/transfusion").get(verifyUser, readFacilitatorTransfusion);
+router.route("/type").get(verifyUser, readFacilitatorByType);
 
 router
   .route("/:id")
-  .get(readFacilitator)
-  .put(updateFacilitator)
-  .delete(deleteFacilitator);
+  .get(verifyUser, readFacilitator)
+  .put(verifyAdmin, updateFacilitator)
+  .delete(verifyAdmin, deleteFacilitator);
 
 export default router;

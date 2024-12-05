@@ -5,13 +5,17 @@ import {
   readPerson,
   updatePerson,
 } from "../controller/person.js";
+import { verifyUser, verifyAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
 // Middleware to parse JSON bodies
 router.use(express.json());
 
-router.route("/").get(readPerson).post(createPerson);
-// router.route("/sum").get();
-router.route("/:id").get(readPerson).put(updatePerson).delete(deletePerson);
+router.route("/").get(verifyUser, readPerson).post(verifyAdmin, createPerson);
+router
+  .route("/:id")
+  .get(verifyUser, readPerson)
+  .put(verifyAdmin, updatePerson)
+  .delete(verifyAdmin, deletePerson);
 
 export default router;
